@@ -363,7 +363,7 @@ describe 'Integration tests' do
     example 'add incomplete activity' do
       expect do
         @feed42.add_activity({})
-      end.to raise_error Stream::StreamApiResponseException
+      end.to raise_error Stream::StreamApiResponseInputException
     end
 
     it 'should be able to follow many feeds in one request' do
@@ -383,7 +383,7 @@ describe 'Integration tests' do
       expect do
         @client.follow_many(follows, 5000)
       end.to raise_error(
-        Stream::StreamApiResponseException,
+        Stream::StreamApiResponseInputException,
         %r{^POST #{url}/follow_many/\?activity_copy_limit=5000&api_key=[^:]+: 400: InputException details: activity_copy_limit must be a non-negative number not greater than 1000$}
       )
     end
@@ -405,7 +405,7 @@ describe 'Integration tests' do
       expect do
         @client.unfollow_many(unfollows)
       end.to raise_error(
-        Stream::StreamApiResponseException,
+        Stream::StreamApiResponseInputException,
         %r{^POST #{url}/unfollow_many/\?api_key=[^:]+: 400: InputException details: invalid request payload$}
       )
     end
@@ -418,7 +418,7 @@ describe 'Integration tests' do
 
     example 'updating many feed activities' do
       activities = []
-      (0..10).each do |i|
+      11.times do |i|
         activities << {
           actor: 'user:1',
           verb: 'do',
@@ -464,7 +464,7 @@ describe 'Integration tests' do
       end
       example 'add object to collection twice' do
         @client.collections.add('animals', { type: 'bear' }, id: @item_id)
-        expect { @client.collections.add('animals', {}, id: @item_id) }.to raise_error Stream::StreamApiResponseException
+        expect { @client.collections.add('animals', {}, id: @item_id) }.to raise_error Stream::StreamApiResponseInputException
       end
       example 'get collection item' do
         @client.collections.add('animals', { type: 'fox' }, id: @item_id)
@@ -482,7 +482,7 @@ describe 'Integration tests' do
       example 'collection item delete' do
         @client.collections.add('animals', { type: 'snake' }, id: @item_id)
         @client.collections.delete('animals', @item_id)
-        expect { @client.collections.get('animals', @item_id) }.to raise_error Stream::StreamApiResponseException
+        expect { @client.collections.get('animals', @item_id) }.to raise_error Stream::StreamApiResponseDoesNotExistException
       end
     end
 
@@ -604,7 +604,7 @@ describe 'Integration tests' do
                                         })
         activity.delete('duration')
 
-        expect { @client.get_activities }.to raise_error Stream::StreamApiResponseException
+        expect { @client.get_activities }.to raise_error Stream::StreamApiResponseInputException
 
         # get by ID
         by_id = @client.get_activities(
@@ -837,7 +837,7 @@ describe 'Integration tests' do
       end
       example 'add user twice with error' do
         @client.users.add(@user_id)
-        expect { @client.users.add(@user_id) }.to raise_error Stream::StreamApiResponseException
+        expect { @client.users.add(@user_id) }.to raise_error Stream::StreamApiResponseConflictException
       end
       example 'get user' do
         create_response = @client.users.add(@user_id, data: { animal: 'wolf' })
@@ -848,6 +848,16 @@ describe 'Integration tests' do
 
         expect(get_response).to eq create_response
       end
+      example 'get user with does not exist error' do
+        url = @client.get_http_client.conn.url_prefix.to_s.gsub(%r{/+$}, '')
+
+        expect do
+          @client.users.get(@user_id)
+        end.to raise_error(
+          Stream::StreamApiResponseDoesNotExistException,
+          %r{^GET #{url}/user/#{@user_id}/\?api_key=[^:]+: 404: url not found$}
+        )
+      end
       example 'update user' do
         @client.users.add(@user_id)
         response = @client.users.update(@user_id, data: { animal: 'dog' })
@@ -857,7 +867,7 @@ describe 'Integration tests' do
       example 'delete user' do
         @client.users.add(@user_id)
         @client.users.delete(@user_id)
-        expect { @client.users.get(@user_id) }.to raise_error Stream::StreamApiResponseException
+        expect { @client.users.get(@user_id) }.to raise_error Stream::StreamApiResponseDoesNotExistException
       end
     end
 
@@ -903,7 +913,7 @@ describe 'Integration tests' do
       example 'delete reaction' do
         reaction = @client.reactions.add('like', @activity['id'], 'jim')
         @client.reactions.delete(reaction['id'])
-        expect { @client.reactions.get(reaction['id']) }.to raise_error Stream::StreamApiResponseException
+        expect { @client.reactions.get(reaction['id']) }.to raise_error Stream::StreamApiResponseDoesNotExistException
       end
       example 'filter reactions' do
         parent = @client.reactions.add('like', @activity['id'], 'jim')
